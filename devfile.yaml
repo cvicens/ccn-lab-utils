@@ -1,0 +1,88 @@
+metadata:
+    name: ccn-workspace
+  components:
+    - id: redhat/java/latest
+      type: chePlugin
+    - mountSources: true
+      endpoints:
+        - name: web-user1
+          port: 8080
+          attributes:
+            public: 'true'
+            protocol: http
+            discoverable: 'true'
+        - name: debug-user1
+          port: 5005
+          attributes:
+            public: 'true'
+            protocol: jdwp
+            discoverable: 'true'
+      memoryLimit: 4Gi
+      type: dockerimage
+      alias: quarkus-tools
+      image: >-
+        image-registry.openshift-image-registry.svc:5000/openshift/quarkus-stack:1.7
+      env:
+        - value: /home/jboss/.m2
+          name: MAVEN_CONFIG
+        - value: >-
+            -Xmx4G -Xss128M -XX:MetaspaceSize=1G -XX:MaxMetaspaceSize=2G
+            -XX:+CMSClassUnloadingEnabled
+          name: MAVEN_OPTS
+  apiVersion: 1.0.0
+  commands:
+    - name: Build
+      actions:
+        - workdir: '${CHE_PROJECTS_ROOT}'
+          type: exec
+          command: 'mvn clean package -f ${current.project.path}'
+          component: quarkus-tools
+    - name: Test
+      actions:
+        - workdir: '${CHE_PROJECTS_ROOT}'
+          type: exec
+          command: 'mvn verify -f ${current.project.path}'
+          component: quarkus-tools
+    - name: Build and Run Locally
+      actions:
+        - workdir: '${CHE_PROJECTS_ROOT}'
+          type: exec
+          command: 'mvn clean compile quarkus:dev -f ${current.project.path}'
+          component: quarkus-tools
+    - name: Build Native Quarkus App
+      actions:
+        - workdir: '${CHE_PROJECTS_ROOT}'
+          type: exec
+          command: 'mvn -f ${current.project.path} clean package -Pnative -DskipTests'
+          component: quarkus-tools
+    - name: Package for OpenShift
+      actions:
+        - workdir: '${CHE_PROJECTS_ROOT}'
+          type: exec
+          command: >-
+            mvn -f ${current.project.path} clean package -DskipTests
+            -Dquarkus.profile=prod
+          component: quarkus-tools
+    - name: Run Spring Boot App
+      actions:
+        - workdir: '${CHE_PROJECTS_ROOT}'
+          type: exec
+          command: 'mvn spring-boot:run -f ${current.project.path}'
+          component: quarkus-tools
+    - name: Start Debugger on 5005
+      actions:
+        - referenceContent: |
+            {
+              "version": "0.2.0",
+              "configurations": [
+                {
+                  "type": "java",
+                  "request": "attach",
+                  "name": "Attach to App",
+                  "hostName": "localhost",
+                  "port": 5005
+                }
+              ]
+            }
+          type: vscode-launch
+  
